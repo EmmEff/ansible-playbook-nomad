@@ -1,7 +1,5 @@
 # ansible-playbook-nomad
 
-## Summary
-
 Ansible playbook to install Nomad (and Consul) on a bare Ubuntu server/VM/instance. This has been tested with Ubuntu Bionic running on OpenStack with the official Bionic image.
 
 Derived from HashiCorp Nomad Vagrant Getting Started example `Vagrantfile`.
