@@ -11,13 +11,6 @@
 
     - setup:
 
-    - name: Install http proxy setting for apt
-      lineinfile:
-        path: /etc/apt/apt.conf
-        regexp: "^Acquire::http::Proxy"
-        line: "Acquire::http::Proxy \"http://192.168.0.1:3128\";"
-        create: yes
-
     - name: Installing Docker dependencies
       apt:
         name: "{{ packages }}"
