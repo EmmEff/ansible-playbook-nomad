@@ -1,0 +1,119 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: no
+  vars:
+    CONSUL_VERSION: 1.4.0
+    NOMAD_VERSION: 0.8.7
+  tasks:
+    - name: Install python-minimal on Ubuntu
+      raw: dpkg -l python-minimal || ( apt update && apt install -y python-minimal )
+
+    - setup:
+
+    - name: Install http proxy setting for apt
+      lineinfile:
+        path: /etc/apt/apt.conf
+        regexp: "^Acquire::http::Proxy"
+        line: "Acquire::http::Proxy \"http://192.168.0.1:3128\";"
+        create: yes
+
+    - name: Installing Docker dependencies
+      apt:
+        name: "{{ packages }}"
+        update_cache: yes
+      vars:
+        packages:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - unzip
+          - vim
+
+    - name: Install Docker gpg key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Install Docker repository
+      apt_repository:
+        repo: "deb https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker
+      apt:
+        name: docker-ce
+        update_cache: yes
+
+    - name: Enable Docker access for ubuntu user
+      user:
+        name: ubuntu
+        groups:
+          - docker
+        state: present
+        append: yes
+
+    - name: Download Nomad
+      get_url:
+        url: "https://releases.hashicorp.com/nomad/{{ NOMAD_VERSION }}/nomad_{{ NOMAD_VERSION }}_linux_amd64.zip"
+        dest: /tmp/nomad.zip
+
+    - name: Installing nomad
+      unarchive:
+        src: /tmp/nomad.zip
+        dest: /usr/bin
+        remote_src: yes
+
+    - name: Creating /etc/nomad.d
+      file:
+        path: /etc/nomad.d
+        mode: 0777
+        state: directory
+
+    - name: Download Consul
+      get_url:
+        url: "https://releases.hashicorp.com/consul/{{ CONSUL_VERSION }}/consul_{{ CONSUL_VERSION }}_linux_amd64.zip"
+        dest: /tmp/consul.zip
+
+    - name: Installing consul
+      unarchive:
+        src: /tmp/consul.zip
+        dest: /usr/bin
+        remote_src: yes
+
+    - name: Create systemd unit file for consul
+      copy:
+        content: |
+          [Unit]
+          Description=consul agent
+          Requires=network-online.target
+          After=network-online.target
+
+          [Service]
+          Restart=on-failure
+          ExecStart=/usr/bin/consul agent -dev
+          ExecReload=/bin/kill -HUP $MAINPID
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/consul.service
+
+    - name: Enable and start consul.service
+      systemd:
+        state: started
+        name: consul.service
+        enabled: yes
+        masked: no
+
+    - name: Download dependencies
+      get_url:
+        url: "https://pkg.cfssl.org/R1.2/{{ item }}_linux-amd64"
+        dest: "/usr/local/bin/{{ item }}"
+      loop:
+        - cfssl
+        - cfssl-certinfo
+        - cfssljson
+
+    - name: Run Nomad integrated install
+      shell: nomad -autocomplete-install
